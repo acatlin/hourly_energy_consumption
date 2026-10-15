@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- @@head:begin -->
-<title>AEP Hourly Load</title>
+<title>PJM Hourly Load</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: one centered column. A row of four stat tiles, then the hour-of-day line chart at full
-   width, then the monthly and day-of-week bar charts side by side. Everything stacks on a phone. */
+/* Layout: one centered column. A masthead with the zone menu, a row of four stat tiles, then the
+   hour-of-day line chart at full width, then the monthly and day-of-week bar charts side by side.
+   Everything stacks on a phone. */
 :root {
   --bg: #f9f9f7;
   --surface: #fcfcfb;
@@ -133,6 +134,68 @@ h1 {
   text-underline-offset: 2px;
 }
 .status { color: var(--ink-3); }
+.status button {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--axis);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* Zone menu: a native select, restyled, above the source listing */
+.aside {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  flex: 0 1 360px;
+}
+.zone-pick { display: grid; gap: 4px; }
+.zone-pick label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.zone-pick .select { position: relative; }
+.zone-pick select {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 8px 36px 8px 12px;
+  border: 1px solid var(--ring);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.zone-pick select:hover { border-color: var(--axis); }
+.zone-pick .select::after {
+  content: "";
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -6px;
+  border-right: 1.5px solid var(--ink-3);
+  border-bottom: 1.5px solid var(--ink-3);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* While a zone's file downloads, the previous figures stay in place but fade */
+.kpis, .charts { transition: opacity 0.2s; }
+.page[aria-busy="true"] .kpis, .page[aria-busy="true"] .charts { opacity: 0.45; }
 
 /* Stat tiles */
 .kpis {
@@ -331,7 +394,7 @@ th:first-child, td:first-child { text-align: left; }
 .notes a { color: inherit; overflow-wrap: anywhere; }
 
 :focus-visible { outline: 2px solid var(--weekday); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .chart .bar { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .chart .bar, .kpis, .charts { transition: none; } }
 </style>
 <!-- @@head:end -->
 </head>
@@ -339,15 +402,21 @@ th:first-child, td:first-child { text-align: left; }
 <main class="page">
   <header class="masthead">
     <div>
-      <p class="eyebrow">PJM Interconnection · AEP zone</p>
-      <h1>AEP Hourly Load</h1>
-      <p class="lede">Hourly electricity demand for the American Electric Power zone of PJM, <span id="range">October 2004 to August 2018</span>. Every figure on this page is computed in your browser from the source file when it opens.</p>
+      <p class="eyebrow" id="eyebrow">PJM Interconnection · AEP zone</p>
+      <h1 id="title">AEP Hourly Load</h1>
+      <p class="lede">Hourly electricity demand for <span id="zone-desc">the American Electric Power zone of PJM</span><span id="range"></span>. Every figure on this page is computed in your browser from the selected zone's source file.</p>
     </div>
-    <dl class="source">
-      <dt>Source file</dt>
-      <dd><a id="src-link" href="https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv" target="_blank" rel="noopener">AEP_hourly.csv</a> on GitHub</dd>
-      <dd class="status" id="src-status">Loading the file…</dd>
-    </dl>
+    <div class="aside">
+      <div class="zone-pick">
+        <label for="zone">Zone</label>
+        <div class="select"><select id="zone"></select></div>
+      </div>
+      <dl class="source">
+        <dt>Source file</dt>
+        <dd><a id="src-link" href="https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv" target="_blank" rel="noopener">AEP_hourly.csv</a> on GitHub</dd>
+        <dd class="status" id="src-status" aria-live="polite">Loading the file…</dd>
+      </dl>
+    </div>
   </header>
 
   <section class="kpis" aria-label="Key figures">
@@ -431,9 +500,9 @@ th:first-child, td:first-child { text-align: left; }
   </section>
 
   <footer class="notes">
-    <p>Load is in megawatts (MW), one reading per hour, as published by PJM for the AEP zone. Timestamps are local clock time as published; the four repeated hours at daylight-saving changes count as separate readings.</p>
+    <p>Load is in megawatts (MW), one reading per hour, as published by PJM for the <span id="note-area">AEP zone</span>. Timestamps are local clock time as published<span id="note-dups"></span>.</p>
     <p>Summer is June through August and winter is December through February. A month counts as above average when its mean exceeds the mean of every hourly reading. Weekend is Saturday and Sunday.</p>
-    <p>Data: <a href="https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv" target="_blank" rel="noopener">https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv</a>, from the Kaggle dataset Hourly Energy Consumption (PJM Interconnection).</p>
+    <p>Data: <a id="data-link" href="https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv" target="_blank" rel="noopener">https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv</a>, one of twelve per-zone files from the Kaggle dataset Hourly Energy Consumption (PJM Interconnection).</p>
   </footer>
 </main>
 <div class="tooltip" id="tooltip" role="status" hidden></div>
@@ -443,14 +512,35 @@ th:first-child, td:first-child { text-align: left; }
 (function () {
   "use strict";
 
-  var DATA_URL = "https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv";
-  var LOCAL_COPY = "AEP_hourly.csv"; // a copy published next to this page, used only when the raw URL is blocked
+  var DATA_BASE = "https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/";
+  var DEFAULT_ZONE = "AEP";
+
+  /* @@zones:begin */
+  // One entry per per-zone file in the repo, in menu order. code is the file prefix (<code>_hourly.csv);
+  // label is the short display name (defaults to code); area completes "PJM Interconnection · ..." and
+  // "as published by PJM for the ..."; desc completes "Hourly electricity demand for ...".
+  var ZONES = [
+    { code: "AEP", name: "American Electric Power", area: "AEP zone", desc: "the American Electric Power zone of PJM" },
+    { code: "COMED", name: "Commonwealth Edison", area: "COMED zone", desc: "the Commonwealth Edison zone of PJM, around Chicago" },
+    { code: "DAYTON", name: "Dayton Power and Light", area: "DAYTON zone", desc: "the Dayton Power and Light zone of PJM" },
+    { code: "DEOK", name: "Duke Energy Ohio/Kentucky", area: "DEOK zone", desc: "the Duke Energy Ohio/Kentucky zone of PJM" },
+    { code: "DOM", name: "Dominion Virginia Power", area: "DOM zone", desc: "the Dominion Virginia Power zone of PJM" },
+    { code: "DUQ", name: "Duquesne Light", area: "DUQ zone", desc: "the Duquesne Light zone of PJM, around Pittsburgh" },
+    { code: "EKPC", name: "East Kentucky Power Cooperative", area: "EKPC zone", desc: "the East Kentucky Power Cooperative zone of PJM" },
+    { code: "FE", name: "FirstEnergy", area: "FE zone", desc: "the FirstEnergy zone of PJM" },
+    { code: "NI", name: "Northern Illinois Hub", area: "NI hub", desc: "the Northern Illinois Hub of PJM" },
+    { code: "PJME", name: "PJM East", label: "PJM East", area: "East region", desc: "the eastern region of PJM" },
+    { code: "PJMW", name: "PJM West", label: "PJM West", area: "West region", desc: "the western region of PJM" },
+    { code: "PJM_Load", name: "PJM total load", label: "PJM Total", area: "whole system", desc: "the whole of PJM, before the East/West split" }
+  ];
+  /* @@zones:end */
 
   /* @@compute:begin */
   function aggregate(text) {
     var lines = text.split("\n");
     var n = 0, total = 0, max = -Infinity, maxT = "", min = Infinity, minT = "";
     var first = "￿", last = "";
+    var seen = new Set(), dups = 0; // dups counts every repeat of a timestamp beyond its first row
     var hw = new Float64Array(24), hwc = new Uint32Array(24);
     var he = new Float64Array(24), hec = new Uint32Array(24);
     var mo = new Float64Array(13), moc = new Uint32Array(13);
@@ -463,6 +553,7 @@ th:first-child, td:first-child { text-align: left; }
       var v = parseFloat(line.slice(comma + 1));
       if (!isFinite(v)) continue;
       var ts = line.slice(0, 19);
+      if (seen.has(ts)) dups++; else seen.add(ts);
       var y = +ts.slice(0, 4), m = +ts.slice(5, 7), d = +ts.slice(8, 10), h = +ts.slice(11, 13);
       var dow = (Math.floor(Date.UTC(y, m - 1, d) / 86400000) + 3) % 7; // Monday = 0 ... Sunday = 6
       n++;
@@ -485,7 +576,7 @@ th:first-child, td:first-child { text-align: left; }
     }
     function sum(a) { var s = 0; for (var k = 0; k < a.length; k++) s += a[k]; return s; }
     return {
-      rows: n, avg: n ? total / n : null,
+      rows: n, dups: dups, avg: n ? total / n : null,
       max: max, maxT: maxT, min: min, minT: minT, first: first, last: last,
       hourWeekday: means(hw, hwc, 0, 24), hourWeekend: means(he, hec, 0, 24),
       weekdayN: sum(hwc), weekendN: sum(hec),
@@ -771,19 +862,58 @@ th:first-child, td:first-child { text-align: left; }
     host.append(table);
   }
 
-  // Render once, then again whenever the container's width changes
-  function mountChart(host, render) {
-    var w = host.clientWidth;
-    render(host);
-    if ("ResizeObserver" in window) {
+  // Three charts, one per host. A ResizeObserver per host re-renders it whenever its width changes
+  // (window resize, or the table toggled back to the chart), always from the stats on screen.
+  var RENDERERS = { hour: renderHourChart, month: renderMonthChart, dow: renderDowChart };
+  var shown = null; // stats on screen, or null before the first load and after a failed one
+  var widths = {};
+  function drawChart(key) {
+    var host = document.getElementById("plot-" + key);
+    widths[key] = host.clientWidth;
+    if (shown) RENDERERS[key](host, shown);
+  }
+  if ("ResizeObserver" in window) {
+    Object.keys(RENDERERS).forEach(function (key) {
+      var host = document.getElementById("plot-" + key);
       new ResizeObserver(function () {
         var cw = host.clientWidth;
-        if (cw && cw !== w) { w = cw; render(host); }
+        if (cw && cw !== widths[key]) drawChart(key);
       }).observe(host);
-    }
+    });
+  }
+
+  function fileOf(zone) { return zone.code + "_hourly.csv"; }
+  function rawUrl(zone) { return DATA_BASE + fileOf(zone); }
+  function labelOf(zone) { return zone.label || zone.code; }
+  function zoneByCode(code) {
+    var want = String(code || "").toUpperCase();
+    for (var i = 0; i < ZONES.length; i++) if (ZONES[i].code.toUpperCase() === want) return ZONES[i];
+    return null;
+  }
+
+  // Masthead, links and footer wording for a zone; set as soon as it is selected, before its data arrives
+  function applyZoneText(zone) {
+    var url = rawUrl(zone), file = fileOf(zone);
+    document.title = labelOf(zone) + " Hourly Load";
+    setText("eyebrow", "PJM Interconnection · " + zone.area);
+    setText("title", labelOf(zone) + " Hourly Load");
+    setText("zone-desc", zone.desc);
+    setText("range", "");
+    setText("note-area", zone.area);
+    setText("note-dups", "");
+    var src = document.getElementById("src-link"), data = document.getElementById("data-link");
+    src.href = url; src.textContent = file;
+    data.href = url; data.textContent = url;
+  }
+
+  function dupsNote(n) {
+    if (!n) return "; no timestamp is repeated";
+    if (n === 1) return "; one timestamp is repeated (the hour that recurs when clocks fall back) and counts as a separate reading";
+    return "; " + fmt0.format(n) + " timestamps are repeated (the hour that recurs when clocks fall back) and count as separate readings";
   }
 
   function renderAll(stats, source) {
+    hideTip();
     setText("k-avg", fmt0.format(stats.avg));
     setText("k-avg-note", "Mean of " + fmt0.format(stats.rows) + " hourly readings");
     setText("k-max", fmt0.format(stats.max));
@@ -791,20 +921,26 @@ th:first-child, td:first-child { text-align: left; }
     setText("k-min", fmt0.format(stats.min));
     setText("k-min-note", fmtTs(stats.minT));
 
-    var s = stats.summerAvg, w = stats.winterAvg, rel = s / w - 1;
-    setText("k-season", (rel >= 0 ? "+" : "−") + Math.abs(rel * 100).toFixed(1) + "%");
-    setText("k-season-note", "Summer (Jun to Aug) averages " + fmt0.format(s) + " MW, " + Math.abs(rel * 100).toFixed(1) + "% " +
-      (rel >= 0 ? "above" : "below") + " winter (Dec to Feb) at " + fmt0.format(w) + " MW");
+    var s = stats.summerAvg, w = stats.winterAvg;
+    if (s == null || w == null) {
+      setText("k-season", "—");
+      setText("k-season-note", "This zone's file has no " + (s == null ? "summer" : "winter") + " readings");
+    } else {
+      var rel = s / w - 1;
+      setText("k-season", (rel >= 0 ? "+" : "−") + Math.abs(rel * 100).toFixed(1) + "%");
+      setText("k-season-note", "Summer (Jun to Aug) averages " + fmt0.format(s) + " MW, " + Math.abs(rel * 100).toFixed(1) + "% " +
+        (rel >= 0 ? "above" : "below") + " winter (Dec to Feb) at " + fmt0.format(w) + " MW");
+    }
 
-    setText("range", fmtDate(stats.first) + " to " + fmtDate(stats.last));
+    setText("range", ", " + fmtDate(stats.first) + " to " + fmtDate(stats.last));
     setText("legend-avg", " " + fmt0.format(stats.avg) + " MW");
+    setText("note-dups", dupsNote(stats.dups));
     setText("src-status", "Loaded " + fmt0.format(stats.rows) + " rows " + (source === "raw"
       ? "from the raw GitHub file"
       : "from a copy of the raw GitHub file published with this page (this viewer blocks outside downloads)"));
 
-    mountChart(document.getElementById("plot-hour"), function (host) { renderHourChart(host, stats); });
-    mountChart(document.getElementById("plot-month"), function (host) { renderMonthChart(host, stats); });
-    mountChart(document.getElementById("plot-dow"), function (host) { renderDowChart(host, stats); });
+    shown = stats;
+    Object.keys(RENDERERS).forEach(drawChart);
 
     buildTable(document.getElementById("table-hour"), ["Hour", "Weekday (MW)", "Weekend (MW)", "Weekday minus weekend"],
       stats.hourWeekday.map(function (v, i) {
@@ -832,16 +968,40 @@ th:first-child, td:first-child { text-align: left; }
     });
   });
 
-  function fail(err) {
-    setText("src-status", "Could not load the file: " + err.message);
+  // A failed download clears the previous zone's figures so nothing stale sits under the new heading
+  function fail(zone, err) {
+    shown = null;
+    hideTip();
+    var status = document.getElementById("src-status");
+    status.textContent = "Could not load " + fileOf(zone) + ": " + err.message + ". ";
+    var retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Retry";
+    retry.addEventListener("click", function () { loadZone(zone.code); });
+    status.append(retry);
+    ["k-avg", "k-max", "k-min", "k-season"].forEach(function (id) { setText(id, "—"); });
+    setText("k-avg-note", "Mean of every hourly reading");
+    setText("k-max-note", "Highest single hour");
+    setText("k-min-note", "Lowest single hour");
+    setText("k-season-note", "Summer average relative to winter average");
+    setText("legend-avg", "");
+    document.querySelectorAll(".toggle").forEach(function (btn) {
+      var key = btn.getAttribute("data-target"), table = document.getElementById("table-" + key);
+      btn.disabled = true;
+      btn.setAttribute("aria-pressed", "false");
+      btn.textContent = "Table";
+      document.getElementById("plot-" + key).hidden = false;
+      table.hidden = true;
+      table.replaceChildren();
+    });
     document.querySelectorAll(".plot").forEach(function (p) {
       p.replaceChildren();
       var msg = document.createElement("p");
       msg.className = "placeholder";
-      msg.textContent = "No data. The page could not download " + DATA_URL;
+      msg.textContent = "No data. The page could not download " + rawUrl(zone);
       p.append(msg);
     });
-    console.error("[AEP] load failed", err);
+    console.error("[PJM] " + zone.code + " load failed", err);
   }
 
   function fetchText(url) {
@@ -851,22 +1011,67 @@ th:first-child, td:first-child { text-align: left; }
     });
   }
 
-  function load() {
-    fetchText(DATA_URL).then(function (text) {
+  // Download a zone's file (the raw URL first, then the copy published next to this page) and aggregate it
+  function fetchZone(zone) {
+    return fetchText(rawUrl(zone)).then(function (text) {
       return { text: text, source: "raw" };
     }).catch(function (e1) {
-      console.warn("[AEP] raw URL blocked or unreachable (" + e1.message + "); trying the published copy");
-      return fetchText(LOCAL_COPY).then(function (text) { return { text: text, source: "bundled" }; });
+      console.warn("[PJM] raw URL blocked or unreachable (" + e1.message + "); trying the published copy of " + fileOf(zone));
+      return fetchText(fileOf(zone)).then(function (text) { return { text: text, source: "bundled" }; });
     }).then(function (got) {
       var stats = aggregate(got.text);
-      window.__aepStats = stats;
-      window.__aepSource = got.source;
-      console.log("[AEP] loaded " + stats.rows + " rows from " + got.source);
-      renderAll(stats, got.source);
-    }).catch(fail);
+      if (!stats.rows) throw new Error("no readings found in " + fileOf(zone));
+      return { stats: stats, source: got.source };
+    });
   }
 
-  load();
+  var page = document.querySelector(".page");
+  var loaded = {}; // zone code -> promise of { stats, source }; the CSV text is dropped once aggregated
+  var ticket = 0;  // the latest selection wins when zones change while a download is in flight
+  function loadZone(code) {
+    var zone = zoneByCode(code) || zoneByCode(DEFAULT_ZONE);
+    var my = ++ticket;
+    hideTip();
+    applyZoneText(zone);
+    setText("src-status", "Loading " + fileOf(zone) + "…");
+    page.setAttribute("aria-busy", "true");
+    if (!loaded[zone.code]) {
+      loaded[zone.code] = fetchZone(zone).catch(function (err) { delete loaded[zone.code]; throw err; });
+    }
+    loaded[zone.code].then(function (got) {
+      if (my !== ticket) return;
+      window.__dashboard = { zone: zone.code, stats: got.stats, source: got.source };
+      console.log("[PJM] " + zone.code + ": loaded " + got.stats.rows + " rows from " + got.source);
+      renderAll(got.stats, got.source);
+    }, function (err) {
+      if (my !== ticket) return;
+      fail(zone, err);
+    }).then(function () {
+      if (my === ticket) page.removeAttribute("aria-busy");
+    });
+  }
+
+  // The zone menu; ?zone=<code> in the page URL opens that zone and follows the menu
+  var select = document.getElementById("zone");
+  ZONES.forEach(function (z) { select.add(new Option(z.code + " · " + z.name, z.code)); });
+  function zoneFromUrl() {
+    try { return new URLSearchParams(location.search).get("zone"); } catch (e) { return null; }
+  }
+  function rememberInUrl(code) {
+    try {
+      var params = new URLSearchParams(location.search);
+      params.set("zone", code);
+      history.replaceState(null, "", location.pathname + "?" + params.toString() + location.hash);
+    } catch (e) { /* a sandboxed viewer may refuse URL changes; the menu still works */ }
+  }
+  select.addEventListener("change", function () {
+    rememberInUrl(select.value);
+    loadZone(select.value);
+  });
+
+  var initial = zoneByCode(zoneFromUrl()) || zoneByCode(DEFAULT_ZONE);
+  select.value = initial.code;
+  loadZone(initial.code);
 })();
 </script>
 </body>
