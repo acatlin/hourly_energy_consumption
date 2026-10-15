@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- @@head:begin -->
+<title>AEP Hourly Load</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one centered column. A row of four stat tiles, then the hour-of-day line chart at full
+   width, then the monthly and day-of-week bar charts side by side. Everything stacks on a phone. */
+:root {
+  --bg: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.10);
+  --weekday: #2a78d6;
+  --weekend: #eb6834;
+  --high: #e34948;
+  --quiet: #949289;
+  --tip-bg: #0b0b0b;
+  --tip-fg: #fcfcfb;
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --ring: rgba(255, 255, 255, 0.10);
+    --weekday: #3987e5;
+    --weekend: #d95926;
+    --high: #e66767;
+    --quiet: #6b6a66;
+    --tip-bg: #2c2c2a;
+    --tip-fg: #ffffff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --ink-3: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --ring: rgba(255, 255, 255, 0.10);
+  --weekday: #3987e5;
+  --weekend: #d95926;
+  --high: #e66767;
+  --quiet: #6b6a66;
+  --tip-bg: #2c2c2a;
+  --tip-fg: #ffffff;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-block: 28px 40px;
+  padding-inline: 24px;
+  display: grid;
+  gap: 24px;
+}
+@media (max-width: 480px) { .page { padding-inline: 16px; } }
+
+/* Masthead */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px 32px;
+}
+.masthead > div { min-width: 0; }
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+h1 {
+  margin: 4px 0 8px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.lede {
+  margin: 0;
+  max-width: 65ch;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.source {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.source dt { color: var(--ink-3); }
+.source dd { margin: 0; }
+.source a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--axis);
+  text-underline-offset: 2px;
+}
+.status { color: var(--ink-3); }
+
+/* Stat tiles */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 960px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .kpis { grid-template-columns: minmax(0, 1fr); } }
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 8px;
+  padding: 16px 18px 14px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tile .label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.tile .value {
+  margin: 2px 0 0;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.tile .unit {
+  margin-left: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-3);
+  letter-spacing: 0;
+}
+.tile .note {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+
+/* Chart cards */
+.charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 760px) { .charts { grid-template-columns: minmax(0, 1fr); } }
+.card {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 8px;
+  padding: 16px 18px 12px;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.card-wide { grid-column: 1 / -1; }
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 16px;
+}
+.charts > .card:not(.card-wide) .card-head { flex-direction: column; align-items: flex-start; }
+.card h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.card-title p { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.card-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.legend li { display: flex; align-items: center; gap: 6px; }
+.key { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
+.key-line { height: 2px; border-radius: 1px; }
+.key-dash { height: 0; border-top: 1px dashed var(--ink-3); }
+.key.s-weekday { background: var(--weekday); }
+.key.s-weekend { background: var(--weekend); }
+.key.s-high { background: var(--high); }
+.key.s-quiet { background: var(--quiet); }
+.toggle {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 4px 11px;
+  border: 1px solid var(--ring);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.toggle:hover { border-color: var(--axis); }
+.toggle[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.toggle:disabled { opacity: 0.5; cursor: default; }
+.plot { min-width: 0; }
+.placeholder {
+  margin: 0;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 12px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+th, td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--grid);
+  text-align: right;
+  white-space: nowrap;
+}
+th { font-weight: 500; font-size: 12px; color: var(--ink-3); }
+th:first-child, td:first-child { text-align: left; }
+
+/* SVG chart chrome */
+.chart { display: block; width: 100%; height: auto; font-family: var(--font); }
+.chart .grid { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+.chart .axis { stroke: var(--axis); stroke-width: 1; shape-rendering: crispEdges; }
+.chart .refline { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .tick { fill: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .dlabel { fill: var(--ink-2); font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.chart .elabel { fill: var(--ink-2); font-size: 12px; font-weight: 500; }
+.chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .line.s-weekday { stroke: var(--weekday); }
+.chart .line.s-weekend { stroke: var(--weekend); }
+.chart .dot { stroke: var(--surface); stroke-width: 2; }
+.chart .dot.s-weekday { fill: var(--weekday); }
+.chart .dot.s-weekend { fill: var(--weekend); }
+.chart .xhair { stroke: var(--axis); stroke-width: 1; }
+.chart .bar { transition: opacity 0.12s; }
+.chart .bar.is-hover { opacity: 0.72; }
+.chart .bar.s-weekday { fill: var(--weekday); }
+.chart .bar.s-weekend { fill: var(--weekend); }
+.chart .bar.s-high { fill: var(--high); }
+.chart .bar.s-quiet { fill: var(--quiet); }
+.chart .hit { fill: transparent; pointer-events: all; cursor: crosshair; outline: none; }
+.chart .hit:focus-visible { outline: 2px solid var(--weekday); outline-offset: -2px; }
+
+/* Tooltip */
+.tooltip {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  min-width: 128px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.tip-title { margin-bottom: 4px; font-size: 11.5px; opacity: 0.75; }
+.tip-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tip-row strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tip-row span:last-child { opacity: 0.8; }
+.tip-key { display: inline-block; width: 10px; height: 2px; border-radius: 1px; }
+
+/* Notes */
+.notes {
+  border-top: 1px solid var(--grid);
+  padding-top: 14px;
+  display: grid;
+  gap: 4px;
+  max-width: 80ch;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.notes p { margin: 0; }
+.notes a { color: inherit; overflow-wrap: anywhere; }
+
+:focus-visible { outline: 2px solid var(--weekday); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .chart .bar { transition: none; } }
+</style>
+<!-- @@head:end -->
+</head>
+<body>
+<main class="page">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">PJM Interconnection · AEP zone</p>
+      <h1>AEP Hourly Load</h1>
+      <p class="lede">Hourly electricity demand for the American Electric Power zone of PJM, <span id="range">October 2004 to August 2018</span>. Every figure on this page is computed in your browser from the source file when it opens.</p>
+    </div>
+    <dl class="source">
+      <dt>Source file</dt>
+      <dd><a id="src-link" href="https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv" target="_blank" rel="noopener">AEP_hourly.csv</a> on GitHub</dd>
+      <dd class="status" id="src-status">Loading the file…</dd>
+    </dl>
+  </header>
+
+  <section class="kpis" aria-label="Key figures">
+    <article class="tile">
+      <p class="label">Average load</p>
+      <p class="value"><span id="k-avg">—</span><span class="unit">MW</span></p>
+      <p class="note" id="k-avg-note">Mean of every hourly reading</p>
+    </article>
+    <article class="tile">
+      <p class="label">Peak load</p>
+      <p class="value"><span id="k-max">—</span><span class="unit">MW</span></p>
+      <p class="note" id="k-max-note">Highest single hour</p>
+    </article>
+    <article class="tile">
+      <p class="label">Minimum load</p>
+      <p class="value"><span id="k-min">—</span><span class="unit">MW</span></p>
+      <p class="note" id="k-min-note">Lowest single hour</p>
+    </article>
+    <article class="tile">
+      <p class="label">Summer vs winter</p>
+      <p class="value"><span id="k-season">—</span></p>
+      <p class="note" id="k-season-note">Summer average relative to winter average</p>
+    </article>
+  </section>
+
+  <section class="charts" aria-label="Charts">
+    <figure class="card card-wide" id="fig-hour">
+      <figcaption class="card-head">
+        <div class="card-title">
+          <h2>Load by hour of day</h2>
+          <p>Average load at each hour, weekdays against weekends</p>
+        </div>
+        <div class="card-tools">
+          <ul class="legend" aria-label="Series">
+            <li><span class="key key-line s-weekday"></span>Weekday</li>
+            <li><span class="key key-line s-weekend"></span>Weekend</li>
+          </ul>
+          <button class="toggle" type="button" aria-pressed="false" data-target="hour" disabled>Table</button>
+        </div>
+      </figcaption>
+      <div class="plot" id="plot-hour"><p class="placeholder">Loading…</p></div>
+      <div class="table-wrap" id="table-hour" hidden></div>
+    </figure>
+
+    <figure class="card" id="fig-month">
+      <figcaption class="card-head">
+        <div class="card-title">
+          <h2>Average load by month</h2>
+          <p>Months above the overall average are highlighted</p>
+        </div>
+        <div class="card-tools">
+          <ul class="legend" aria-label="Series">
+            <li><span class="key s-high"></span>Above average</li>
+            <li><span class="key s-quiet"></span>Below average</li>
+            <li><span class="key key-dash"></span>Overall average<span id="legend-avg"></span></li>
+          </ul>
+          <button class="toggle" type="button" aria-pressed="false" data-target="month" disabled>Table</button>
+        </div>
+      </figcaption>
+      <div class="plot" id="plot-month"><p class="placeholder">Loading…</p></div>
+      <div class="table-wrap" id="table-month" hidden></div>
+    </figure>
+
+    <figure class="card" id="fig-dow">
+      <figcaption class="card-head">
+        <div class="card-title">
+          <h2>Average load by day of week</h2>
+          <p>Saturday and Sunday in the weekend color</p>
+        </div>
+        <div class="card-tools">
+          <ul class="legend" aria-label="Series">
+            <li><span class="key s-weekday"></span>Weekday</li>
+            <li><span class="key s-weekend"></span>Weekend</li>
+          </ul>
+          <button class="toggle" type="button" aria-pressed="false" data-target="dow" disabled>Table</button>
+        </div>
+      </figcaption>
+      <div class="plot" id="plot-dow"><p class="placeholder">Loading…</p></div>
+      <div class="table-wrap" id="table-dow" hidden></div>
+    </figure>
+  </section>
+
+  <footer class="notes">
+    <p>Load is in megawatts (MW), one reading per hour, as published by PJM for the AEP zone. Timestamps are local clock time as published; the four repeated hours at daylight-saving changes count as separate readings.</p>
+    <p>Summer is June through August and winter is December through February. A month counts as above average when its mean exceeds the mean of every hourly reading. Weekend is Saturday and Sunday.</p>
+    <p>Data: <a href="https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv" target="_blank" rel="noopener">https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv</a>, from the Kaggle dataset Hourly Energy Consumption (PJM Interconnection).</p>
+  </footer>
+</main>
+<div class="tooltip" id="tooltip" role="status" hidden></div>
+<noscript><p style="padding:16px">This dashboard needs JavaScript to load and chart the data.</p></noscript>
+
+<script>
+(function () {
+  "use strict";
+
+  var DATA_URL = "https://raw.githubusercontent.com/acatlin/hourly_energy_consumption/main/AEP_hourly.csv";
+  var LOCAL_COPY = "AEP_hourly.csv"; // a copy published next to this page, used only when the raw URL is blocked
+
+  /* @@compute:begin */
+  function aggregate(text) {
+    var lines = text.split("\n");
+    var n = 0, total = 0, max = -Infinity, maxT = "", min = Infinity, minT = "";
+    var first = "￿", last = "";
+    var hw = new Float64Array(24), hwc = new Uint32Array(24);
+    var he = new Float64Array(24), hec = new Uint32Array(24);
+    var mo = new Float64Array(13), moc = new Uint32Array(13);
+    var dw = new Float64Array(7), dwc = new Uint32Array(7);
+    var su = 0, suc = 0, wi = 0, wic = 0;
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i];
+      var comma = line.indexOf(",");
+      if (comma < 19) continue;
+      var v = parseFloat(line.slice(comma + 1));
+      if (!isFinite(v)) continue;
+      var ts = line.slice(0, 19);
+      var y = +ts.slice(0, 4), m = +ts.slice(5, 7), d = +ts.slice(8, 10), h = +ts.slice(11, 13);
+      var dow = (Math.floor(Date.UTC(y, m - 1, d) / 86400000) + 3) % 7; // Monday = 0 ... Sunday = 6
+      n++;
+      total += v;
+      if (v > max) { max = v; maxT = ts; }
+      if (v < min) { min = v; minT = ts; }
+      if (ts < first) first = ts;
+      if (ts > last) last = ts;
+      if (dow >= 5) { he[h] += v; hec[h]++; } else { hw[h] += v; hwc[h]++; }
+      mo[m] += v; moc[m]++;
+      dw[dow] += v; dwc[dow]++;
+      if (m >= 6 && m <= 8) { su += v; suc++; }
+      else if (m === 12 || m <= 2) { wi += v; wic++; }
+    }
+    function mean(s, c) { return c ? s / c : null; }
+    function means(sums, counts, from, to) {
+      var out = [];
+      for (var k = from; k < to; k++) out.push(mean(sums[k], counts[k]));
+      return out;
+    }
+    function sum(a) { var s = 0; for (var k = 0; k < a.length; k++) s += a[k]; return s; }
+    return {
+      rows: n, avg: n ? total / n : null,
+      max: max, maxT: maxT, min: min, minT: minT, first: first, last: last,
+      hourWeekday: means(hw, hwc, 0, 24), hourWeekend: means(he, hec, 0, 24),
+      weekdayN: sum(hwc), weekendN: sum(hec),
+      month: means(mo, moc, 1, 13), monthN: Array.prototype.slice.call(moc, 1),
+      dow: means(dw, dwc, 0, 7), dowN: Array.prototype.slice.call(dwc),
+      summerAvg: mean(su, suc), winterAvg: mean(wi, wic), summerN: suc, winterN: wic
+    };
+  }
+  /* @@compute:end */
+
+  var fmt0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  var DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var DAYS_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function signed(x) { return (x >= 0 ? "+" : "−") + fmt0.format(Math.abs(x)); }
+  function fmtHour(h) { return (h % 12 === 0 ? 12 : h % 12) + (h < 12 ? " am" : " pm"); }
+  function fmtDate(ts) {
+    var y = +ts.slice(0, 4), m = +ts.slice(5, 7), d = +ts.slice(8, 10);
+    return MONTHS_LONG[m - 1] + " " + d + ", " + y;
+  }
+  function fmtTs(ts) {
+    var y = +ts.slice(0, 4), m = +ts.slice(5, 7), d = +ts.slice(8, 10);
+    var dow = (Math.floor(Date.UTC(y, m - 1, d) / 86400000) + 3) % 7;
+    return DAYS_LONG[dow] + ", " + MONTHS[m - 1] + " " + d + ", " + y + " at " + ts.slice(11, 16);
+  }
+  function setText(id, txt) { document.getElementById(id).textContent = txt; }
+
+  // SVG helpers
+  var NS = "http://www.w3.org/2000/svg";
+  function svg(tag, attrs) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function label(x, y, str, cls, anchor) {
+    var t = svg("text", { x: x, y: y, "class": cls, "text-anchor": anchor || "start" });
+    t.textContent = str;
+    return t;
+  }
+
+  // Clean axis ticks
+  function niceStep(range, count) {
+    var raw = range / count;
+    var p = Math.pow(10, Math.floor(Math.log10(raw)));
+    var r = raw / p;
+    var s = r <= 1 ? 1 : r <= 2 ? 2 : r <= 2.5 ? 2.5 : r <= 5 ? 5 : 10;
+    return s * p;
+  }
+  function ticksFor(lo, hi, count) {
+    var step = niceStep(hi - lo, count);
+    var start = Math.floor(lo / step) * step;
+    var end = Math.ceil(hi / step) * step;
+    var ticks = [];
+    for (var v = start; v <= end + step * 1e-6; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
+    return { ticks: ticks, lo: start, hi: end };
+  }
+
+  // One shared tooltip
+  var tip = document.getElementById("tooltip");
+  function showTip(x, y, title, rows) {
+    tip.replaceChildren();
+    var t = document.createElement("div");
+    t.className = "tip-title";
+    t.textContent = title;
+    tip.append(t);
+    rows.forEach(function (r) {
+      var row = document.createElement("div");
+      row.className = "tip-row";
+      if (r.color) {
+        var k = document.createElement("span");
+        k.className = "tip-key";
+        k.style.background = r.color;
+        row.append(k);
+      }
+      var v = document.createElement("strong");
+      v.textContent = r.value;
+      var l = document.createElement("span");
+      l.textContent = r.label;
+      row.append(v, l);
+      tip.append(row);
+    });
+    tip.hidden = false;
+    placeTip(x, y);
+  }
+  function placeTip(x, y) {
+    if (tip.hidden) return;
+    var r = tip.getBoundingClientRect();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var left = x + 14, top = y - r.height - 14;
+    if (left + r.width > vw - 8) left = x - r.width - 14;
+    if (left < 8) left = 8;
+    if (top < 8) top = y + 18;
+    if (top + r.height > vh - 8) top = Math.max(8, vh - 8 - r.height);
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+  function hideTip() { tip.hidden = true; }
+
+  // Line chart: average load by hour, weekday vs weekend
+  function renderHourChart(host, stats) {
+    host.replaceChildren();
+    var W = Math.max(320, host.clientWidth), H = 320;
+    var m = { top: 28, right: 76, bottom: 32, left: 54 };
+    var pw = W - m.left - m.right, ph = H - m.top - m.bottom;
+    var wd = stats.hourWeekday, we = stats.hourWeekend;
+    var all = wd.concat(we);
+    var vmin = Math.min.apply(null, all), vmax = Math.max.apply(null, all);
+    var pad = (vmax - vmin) * 0.12;
+    var sc = ticksFor(vmin - pad, vmax + pad, 5);
+    var x = function (h) { return m.left + (h / 23) * pw; };
+    var y = function (v) { return m.top + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * ph; };
+    var root = svg("svg", { viewBox: "0 0 " + W + " " + H, "class": "chart",
+      "aria-label": "Line chart of average load by hour of day, one line for weekdays and one for weekends" });
+
+    sc.ticks.forEach(function (t) {
+      root.append(svg("line", { x1: m.left, x2: W - m.right, y1: y(t), y2: y(t), "class": "grid" }));
+      root.append(label(m.left - 8, y(t) + 4, fmt0.format(t), "tick", "end"));
+    });
+    root.append(label(m.left - 8, m.top - 12, "MW", "tick", "end"));
+    root.append(svg("line", { x1: m.left, x2: W - m.right, y1: m.top + ph, y2: m.top + ph, "class": "axis" }));
+    for (var h = 0; h < 24; h += 3) root.append(label(x(h), H - m.bottom + 20, fmtHour(h), "tick", h === 0 ? "start" : "middle"));
+
+    function pathFor(arr) {
+      return arr.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1); }).join(" ");
+    }
+    root.append(svg("path", { d: pathFor(wd), "class": "line s-weekday" }));
+    root.append(svg("path", { d: pathFor(we), "class": "line s-weekend" }));
+
+    [[wd, "s-weekday"], [we, "s-weekend"]].forEach(function (pair) {
+      var arr = pair[0], top = Math.max.apply(null, arr), i = arr.indexOf(top);
+      root.append(svg("circle", { cx: x(i), cy: y(top), r: 4, "class": "dot " + pair[1] }));
+      root.append(label(x(i), y(top) - 10, fmt0.format(top), "dlabel", "middle"));
+    });
+    root.append(label(x(23) + 8, y(wd[23]) + 4, "Weekday", "elabel"));
+    root.append(label(x(23) + 8, y(we[23]) + 4, "Weekend", "elabel"));
+
+    // Hover layer: a crosshair that snaps to the nearest hour and reads both series
+    var xhair = svg("line", { y1: m.top, y2: m.top + ph, "class": "xhair", visibility: "hidden" });
+    var d1 = svg("circle", { r: 4, "class": "dot s-weekday", visibility: "hidden" });
+    var d2 = svg("circle", { r: 4, "class": "dot s-weekend", visibility: "hidden" });
+    var hit = svg("rect", { x: m.left, y: m.top, width: pw, height: ph, "class": "hit", tabindex: "0", role: "img",
+      "aria-label": "Hourly values. Focus here and use the left and right arrow keys to read each hour." });
+    root.append(xhair, d1, d2, hit);
+    host.append(root);
+
+    var idx = -1;
+    function setIdx(i, cx, cy) {
+      idx = i;
+      var px = x(i);
+      xhair.setAttribute("x1", px); xhair.setAttribute("x2", px);
+      d1.setAttribute("cx", px); d1.setAttribute("cy", y(wd[i]));
+      d2.setAttribute("cx", px); d2.setAttribute("cy", y(we[i]));
+      [xhair, d1, d2].forEach(function (e) { e.setAttribute("visibility", "visible"); });
+      showTip(cx, cy, fmtHour(i) + " · " + pad2(i) + ":00", [
+        { value: fmt0.format(wd[i]) + " MW", label: "weekday", color: "var(--weekday)" },
+        { value: fmt0.format(we[i]) + " MW", label: "weekend", color: "var(--weekend)" }
+      ]);
+    }
+    function clear() {
+      idx = -1;
+      [xhair, d1, d2].forEach(function (e) { e.setAttribute("visibility", "hidden"); });
+      hideTip();
+    }
+    function pointAt(i) {
+      var r = root.getBoundingClientRect(), s = r.width / W;
+      return { x: r.left + x(i) * s, y: r.top + y(Math.max(wd[i], we[i])) * s };
+    }
+    hit.addEventListener("pointermove", function (e) {
+      var r = root.getBoundingClientRect();
+      var px = (e.clientX - r.left) * (W / r.width);
+      var i = Math.max(0, Math.min(23, Math.round((px - m.left) / pw * 23)));
+      setIdx(i, e.clientX, e.clientY);
+    });
+    hit.addEventListener("pointerleave", clear);
+    hit.addEventListener("focus", function () { var p = pointAt(12); setIdx(12, p.x, p.y); });
+    hit.addEventListener("blur", clear);
+    hit.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        var i = Math.max(0, Math.min(23, (idx < 0 ? 12 : idx) + (e.key === "ArrowRight" ? 1 : -1)));
+        var p = pointAt(i);
+        setIdx(i, p.x, p.y);
+      } else if (e.key === "Escape") {
+        clear();
+      }
+    });
+  }
+
+  // Bar chart: one bar per category, thin marks with rounded caps, a hit area per band
+  function renderBars(host, cfg) {
+    host.replaceChildren();
+    var W = Math.max(300, host.clientWidth), H = 300;
+    var m = { top: 30, right: 16, bottom: 32, left: 54 };
+    var pw = W - m.left - m.right, ph = H - m.top - m.bottom;
+    var vals = cfg.values, n = vals.length;
+    var vmax = Math.max.apply(null, vals), vmin = Math.min.apply(null, vals);
+    var sc = ticksFor(0, vmax * 1.06, 4);
+    var y = function (v) { return m.top + (1 - v / sc.hi) * ph; };
+    var band = pw / n, bw = Math.min(24, Math.round(band * 0.6));
+    var root = svg("svg", { viewBox: "0 0 " + W + " " + H, "class": "chart", "aria-label": cfg.aria });
+
+    sc.ticks.forEach(function (t) {
+      if (t > 0) root.append(svg("line", { x1: m.left, x2: W - m.right, y1: y(t), y2: y(t), "class": "grid" }));
+      root.append(label(m.left - 8, y(t) + 4, fmt0.format(t), "tick", "end"));
+    });
+    root.append(label(m.left - 8, m.top - 12, "MW", "tick", "end"));
+    root.append(svg("line", { x1: m.left, x2: W - m.right, y1: y(0), y2: y(0), "class": "axis" }));
+
+    var bars = vals.map(function (v, i) {
+      var cx = m.left + band * (i + 0.5), x0 = cx - bw / 2, yt = y(v), yb = y(0), r = Math.min(4, bw / 2);
+      var d = "M" + x0 + "," + yb + " V" + (yt + r) + " Q" + x0 + "," + yt + " " + (x0 + r) + "," + yt +
+              " H" + (x0 + bw - r) + " Q" + (x0 + bw) + "," + yt + " " + (x0 + bw) + "," + (yt + r) + " V" + yb + " Z";
+      var bar = svg("path", { d: d, "class": "bar " + cfg.classFor(i) });
+      root.append(bar);
+      root.append(label(cx, H - m.bottom + 20, cfg.labels[i], "tick", "middle"));
+      if (v === vmax || v === vmin) root.append(label(cx, yt - 8, fmt0.format(v), "dlabel", "middle"));
+      return bar;
+    });
+    if (cfg.refValue != null) {
+      root.append(svg("line", { x1: m.left, x2: W - m.right, y1: y(cfg.refValue), y2: y(cfg.refValue), "class": "refline" }));
+    }
+    vals.forEach(function (v, i) {
+      var hit = svg("rect", { x: m.left + band * i, y: m.top, width: band, height: ph, "class": "hit", tabindex: "0", role: "img",
+        "aria-label": cfg.longLabels[i] + ": " + fmt0.format(v) + " MW" });
+      function show(cx, cy) { bars[i].classList.add("is-hover"); showTip(cx, cy, cfg.longLabels[i], cfg.tipRows(i)); }
+      function hide() { bars[i].classList.remove("is-hover"); hideTip(); }
+      hit.addEventListener("pointerenter", function (e) { show(e.clientX, e.clientY); });
+      hit.addEventListener("pointermove", function (e) { placeTip(e.clientX, e.clientY); });
+      hit.addEventListener("pointerleave", hide);
+      hit.addEventListener("focus", function () { var r = bars[i].getBoundingClientRect(); show(r.left + r.width / 2, r.top); });
+      hit.addEventListener("blur", hide);
+      root.append(hit);
+    });
+    host.append(root);
+  }
+
+  function renderMonthChart(host, stats) {
+    renderBars(host, {
+      values: stats.month, labels: MONTHS, longLabels: MONTHS_LONG,
+      classFor: function (i) { return stats.month[i] > stats.avg ? "s-high" : "s-quiet"; },
+      refValue: stats.avg,
+      aria: "Bar chart of average load by month; months above the overall average are highlighted",
+      tipRows: function (i) {
+        return [
+          { value: fmt0.format(stats.month[i]) + " MW", label: "average load" },
+          { value: signed(stats.month[i] - stats.avg) + " MW", label: "vs overall average" },
+          { value: fmt0.format(stats.monthN[i]), label: "hours" }
+        ];
+      }
+    });
+  }
+
+  function renderDowChart(host, stats) {
+    renderBars(host, {
+      values: stats.dow, labels: DAYS, longLabels: DAYS_LONG,
+      classFor: function (i) { return i >= 5 ? "s-weekend" : "s-weekday"; },
+      aria: "Bar chart of average load by day of week; Saturday and Sunday are in the weekend color",
+      tipRows: function (i) {
+        return [
+          { value: fmt0.format(stats.dow[i]) + " MW", label: "average load", color: i >= 5 ? "var(--weekend)" : "var(--weekday)" },
+          { value: fmt0.format(stats.dowN[i]), label: "hours" }
+        ];
+      }
+    });
+  }
+
+  function buildTable(host, headers, rows) {
+    host.replaceChildren();
+    var table = document.createElement("table");
+    var thead = document.createElement("thead"), tr = document.createElement("tr");
+    headers.forEach(function (h) { var th = document.createElement("th"); th.scope = "col"; th.textContent = h; tr.append(th); });
+    thead.append(tr);
+    var tbody = document.createElement("tbody");
+    rows.forEach(function (cells) {
+      var r = document.createElement("tr");
+      cells.forEach(function (c) { var td = document.createElement("td"); td.textContent = c; r.append(td); });
+      tbody.append(r);
+    });
+    table.append(thead, tbody);
+    host.append(table);
+  }
+
+  // Render once, then again whenever the container's width changes
+  function mountChart(host, render) {
+    var w = host.clientWidth;
+    render(host);
+    if ("ResizeObserver" in window) {
+      new ResizeObserver(function () {
+        var cw = host.clientWidth;
+        if (cw && cw !== w) { w = cw; render(host); }
+      }).observe(host);
+    }
+  }
+
+  function renderAll(stats, source) {
+    setText("k-avg", fmt0.format(stats.avg));
+    setText("k-avg-note", "Mean of " + fmt0.format(stats.rows) + " hourly readings");
+    setText("k-max", fmt0.format(stats.max));
+    setText("k-max-note", fmtTs(stats.maxT));
+    setText("k-min", fmt0.format(stats.min));
+    setText("k-min-note", fmtTs(stats.minT));
+
+    var s = stats.summerAvg, w = stats.winterAvg, rel = s / w - 1;
+    setText("k-season", (rel >= 0 ? "+" : "−") + Math.abs(rel * 100).toFixed(1) + "%");
+    setText("k-season-note", "Summer (Jun to Aug) averages " + fmt0.format(s) + " MW, " + Math.abs(rel * 100).toFixed(1) + "% " +
+      (rel >= 0 ? "above" : "below") + " winter (Dec to Feb) at " + fmt0.format(w) + " MW");
+
+    setText("range", fmtDate(stats.first) + " to " + fmtDate(stats.last));
+    setText("legend-avg", " " + fmt0.format(stats.avg) + " MW");
+    setText("src-status", "Loaded " + fmt0.format(stats.rows) + " rows " + (source === "raw"
+      ? "from the raw GitHub file"
+      : "from a copy of the raw GitHub file published with this page (this viewer blocks outside downloads)"));
+
+    mountChart(document.getElementById("plot-hour"), function (host) { renderHourChart(host, stats); });
+    mountChart(document.getElementById("plot-month"), function (host) { renderMonthChart(host, stats); });
+    mountChart(document.getElementById("plot-dow"), function (host) { renderDowChart(host, stats); });
+
+    buildTable(document.getElementById("table-hour"), ["Hour", "Weekday (MW)", "Weekend (MW)", "Weekday minus weekend"],
+      stats.hourWeekday.map(function (v, i) {
+        return [fmtHour(i) + " (" + pad2(i) + ":00)", fmt0.format(v), fmt0.format(stats.hourWeekend[i]), signed(v - stats.hourWeekend[i])];
+      }));
+    buildTable(document.getElementById("table-month"), ["Month", "Average (MW)", "vs overall average", "Hours"],
+      stats.month.map(function (v, i) {
+        return [MONTHS_LONG[i], fmt0.format(v), signed(v - stats.avg), fmt0.format(stats.monthN[i])];
+      }));
+    buildTable(document.getElementById("table-dow"), ["Day", "Average (MW)", "Hours"],
+      stats.dow.map(function (v, i) { return [DAYS_LONG[i], fmt0.format(v), fmt0.format(stats.dowN[i])]; }));
+
+    document.querySelectorAll(".toggle").forEach(function (btn) { btn.disabled = false; });
+  }
+
+  document.querySelectorAll(".toggle").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var key = btn.getAttribute("data-target");
+      var plot = document.getElementById("plot-" + key), table = document.getElementById("table-" + key);
+      var showTable = btn.getAttribute("aria-pressed") !== "true";
+      btn.setAttribute("aria-pressed", String(showTable));
+      btn.textContent = showTable ? "Chart" : "Table";
+      plot.hidden = showTable;
+      table.hidden = !showTable;
+    });
+  });
+
+  function fail(err) {
+    setText("src-status", "Could not load the file: " + err.message);
+    document.querySelectorAll(".plot").forEach(function (p) {
+      p.replaceChildren();
+      var msg = document.createElement("p");
+      msg.className = "placeholder";
+      msg.textContent = "No data. The page could not download " + DATA_URL;
+      p.append(msg);
+    });
+    console.error("[AEP] load failed", err);
+  }
+
+  function fetchText(url) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status + " for " + url);
+      return r.text();
+    });
+  }
+
+  function load() {
+    fetchText(DATA_URL).then(function (text) {
+      return { text: text, source: "raw" };
+    }).catch(function (e1) {
+      console.warn("[AEP] raw URL blocked or unreachable (" + e1.message + "); trying the published copy");
+      return fetchText(LOCAL_COPY).then(function (text) { return { text: text, source: "bundled" }; });
+    }).then(function (got) {
+      var stats = aggregate(got.text);
+      window.__aepStats = stats;
+      window.__aepSource = got.source;
+      console.log("[AEP] loaded " + stats.rows + " rows from " + got.source);
+      renderAll(stats, got.source);
+    }).catch(fail);
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
