@@ -29,31 +29,39 @@ def figures(zone):
     df["dow"] = when.dt.dayofweek  # Monday = 0 ... Sunday = 6
     df["weekend"] = df["dow"] >= 5
 
-    peak = df.loc[df["mw"].idxmax()]
-    low = df.loc[df["mw"].idxmin()]
-    in_summer = df["month"].isin(SUMMER_MONTHS)
-    in_winter = df["month"].isin(WINTER_MONTHS)
-    by_hour = df.groupby(["weekend", "hour"])["mw"].mean().unstack("weekend")  # 24 rows, columns False/True
-    by_month = df.groupby("month")["mw"].mean()
-    by_dow = df.groupby("dow")["mw"].mean()
+    # A reading below one fifth of the zone's median is a metering artifact, not load (the compute block
+    # explains the threshold): it counts toward rows, dup_timestamps, first and last but toward no other figure.
+    median = float(df["mw"].median())
+    artifact = df["mw"] < 0.2 * median
+    dropped = df[artifact].sort_values("Datetime")
+    kept = df[~artifact]
+
+    peak = kept.loc[kept["mw"].idxmax()]
+    low = kept.loc[kept["mw"].idxmin()]
+    in_summer = kept["month"].isin(SUMMER_MONTHS)
+    in_winter = kept["month"].isin(WINTER_MONTHS)
+    by_hour = kept.groupby(["weekend", "hour"])["mw"].mean().unstack("weekend")  # 24 rows, columns False/True
+    by_month = kept.groupby("month")["mw"].mean()
+    by_dow = kept.groupby("dow")["mw"].mean()
 
     return {
         "rows": len(df),
         "dup_timestamps": int(df["Datetime"].duplicated().sum()),
-        "nonpositive": int((df["mw"] <= 0).sum()),
         "first": df["Datetime"].min(),
         "last": df["Datetime"].max(),
-        "avg": df["mw"].mean(),
+        "median": median,
+        "excluded": [[float(v), t] for v, t in zip(dropped["mw"], dropped["Datetime"])],
+        "avg": kept["mw"].mean(),
         "max": [float(peak["mw"]), peak["Datetime"]],
         "min": [float(low["mw"]), low["Datetime"]],
-        "summer_avg": df.loc[in_summer, "mw"].mean(),
-        "winter_avg": df.loc[in_winter, "mw"].mean(),
+        "summer_avg": kept.loc[in_summer, "mw"].mean(),
+        "winter_avg": kept.loc[in_winter, "mw"].mean(),
         "summer_n": int(in_summer.sum()),
         "winter_n": int(in_winter.sum()),
         "hour_weekday": by_hour[False].tolist(),
         "hour_weekend": by_hour[True].tolist(),
-        "weekday_n": int((~df["weekend"]).sum()),
-        "weekend_n": int(df["weekend"].sum()),
+        "weekday_n": int((~kept["weekend"]).sum()),
+        "weekend_n": int(kept["weekend"].sum()),
         "month": {int(m): v for m, v in by_month.items()},
         "dow": {DAYS[d]: v for d, v in by_dow.items()},
     }
@@ -64,7 +72,7 @@ out_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os
 out = {}
 for zone in ZONES:
     f = out[zone] = figures(zone)
-    print(f"{zone}: rows={f['rows']} dups={f['dup_timestamps']} nonpositive={f['nonpositive']} range={f['first']}..{f['last']}")
+    print(f"{zone}: rows={f['rows']} dups={f['dup_timestamps']} excluded={len(f['excluded'])} range={f['first']}..{f['last']}")
     print(f"  avg={f['avg']:.1f} max={f['max']} min={f['min']} summer/winter-1={(f['summer_avg'] / f['winter_avg'] - 1) * 100:.2f}%")
 
 with open(out_path, "w", encoding="utf-8") as fh:

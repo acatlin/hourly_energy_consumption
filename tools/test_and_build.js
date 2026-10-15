@@ -56,6 +56,8 @@ for (const code of codes) {
 
   check("rows", stats.rows, r.rows);
   check("dups", stats.dups, r.dup_timestamps);
+  check("median", stats.median, r.median);
+  check("excluded", JSON.stringify(stats.excluded), JSON.stringify(r.excluded));
   check("avg", stats.avg, r.avg);
   check("max", stats.max, r.max[0]);
   check("maxT", stats.maxT, r.max[1]);
@@ -75,8 +77,8 @@ for (const code of codes) {
   }
   for (let m = 1; m <= 12; m++) check("month[" + m + "]", stats.month[m - 1], r.month[String(m)]);
   DAYS.forEach((d, i) => check("dow[" + d + "]", stats.dow[i], r.dow[d]));
-  check("monthN sum", stats.monthN.reduce((a, b) => a + b, 0), r.rows);
-  check("dowN sum", stats.dowN.reduce((a, b) => a + b, 0), r.rows);
+  check("monthN sum", stats.monthN.reduce((a, b) => a + b, 0), r.rows - r.excluded.length);
+  check("dowN sum", stats.dowN.reduce((a, b) => a + b, 0), r.rows - r.excluded.length);
 }
 
 const failed = checks.filter((c) => !c[1]);
