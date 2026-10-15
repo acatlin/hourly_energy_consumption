@@ -8,6 +8,8 @@ Source: PJM Interconnection, as packaged in the Kaggle dataset [Hourly Energy Co
 
 An interactive dashboard of the AEP series (key figures, hour-of-day, monthly and day-of-week patterns) is served from this repo by GitHub Pages at https://acatlin.github.io/hourly_energy_consumption/. The page is `aep_dashboard.html`. It fetches `AEP_hourly.csv` from the raw URL listed below and computes every figure in the browser.
 
+To work on it, run `node tools/test_and_build.js`. It checks the page's aggregation code against the reference figures in `tools/ref_stats.json` and writes a copy of the page without the HTML skeleton to `build/` for publishing elsewhere. `python -I -X utf8 tools/ref_stats.py` regenerates the reference figures from the raw CSV.
+
 ## Data files
 
 Each per-region file has two columns: `Datetime` (an hourly timestamp, with no time zone) and `<REGION>_MW`. Rows are not guaranteed to be in chronological order, so sort by `Datetime` after loading.

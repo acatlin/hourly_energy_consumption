@@ -10,3 +10,6 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Build output
+build/
